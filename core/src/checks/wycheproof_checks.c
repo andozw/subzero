@@ -1,5 +1,9 @@
 // TODO
+#include "config.h"
+#include "checks.h"
+#include "log.h"
 
-void verify_wycheproof(void) {
-  ERROR("foobar 373737!");
+int verify_wycheproof(void) {
+  INFO("foobar 373737!");
+  return 0;
 }
