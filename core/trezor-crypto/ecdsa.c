@@ -24,6 +24,7 @@
 
 #include <assert.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -1079,6 +1080,18 @@ int ecdsa_recover_pub_from_sig(const ecdsa_curve *curve, uint8_t *pub_key,
   return 0;
 }
 
+void bn_print(const bignum256 *a) {
+  printf("%04x", a->val[8] & 0x0000FFFF);
+  printf("%08x", (a->val[7] << 2) | ((a->val[6] & 0x30000000) >> 28));
+  printf("%07x", a->val[6] & 0x0FFFFFFF);
+  printf("%08x", (a->val[5] << 2) | ((a->val[4] & 0x30000000) >> 28));
+  printf("%07x", a->val[4] & 0x0FFFFFFF);
+  printf("%08x", (a->val[3] << 2) | ((a->val[2] & 0x30000000) >> 28));
+  printf("%07x", a->val[2] & 0x0FFFFFFF);
+  printf("%08x", (a->val[1] << 2) | ((a->val[0] & 0x30000000) >> 28));
+  printf("%07x", a->val[0] & 0x0FFFFFFF);
+}
+
 // returns 0 if verification succeeded
 int ecdsa_verify_digest(const ecdsa_curve *curve, const uint8_t *pub_key,
                         const uint8_t *sig, const uint8_t *digest) {
@@ -1121,6 +1134,14 @@ int ecdsa_verify_digest(const ecdsa_curve *curve, const uint8_t *pub_key,
     bn_mod(&(res.x), &curve->order);
     // signature does not match
     if (!bn_is_equal(&res.x, &r)) {
+      printf("res.x: ");
+      bn_print(&res.x);
+      printf("\n");
+
+      printf("r:     ");
+      bn_print(&r);
+      printf("\n");
+
       result = 5;
     }
   }
@@ -1192,4 +1213,53 @@ int ecdsa_sig_to_der(const uint8_t *sig, uint8_t *der) {
 
   *len = *len1 + *len2 + 4;
   return *len + 2;
+}
+
+// Parse a DER-encoded signature. We don't check whether the encoded integers
+// satisfy DER requirements regarding leading zeros.
+int ecdsa_sig_from_der(const uint8_t *der, size_t der_len, uint8_t sig[64]) {
+  memzero(sig, 64);
+
+  // Check sequence header.
+  if (der_len < 2 || der_len > 72 || der[0] != 0x30 || der[1] != der_len - 2) {
+    return 1;
+  }
+
+  // Read two DER-encoded integers.
+  size_t pos = 2;
+  for (int i = 0; i < 2; ++i) {
+    // Check integer header.
+    if (der_len < pos + 2 || der[pos] != 0x02) {
+      return 1;
+    }
+
+    // Locate the integer.
+    size_t int_len = der[pos + 1];
+    pos += 2;
+    if (pos + int_len > der_len) {
+      return 1;
+    }
+
+    // Skip a possible leading zero.
+    if (int_len != 0 && der[pos] == 0) {
+      int_len--;
+      pos++;
+    }
+
+    // Copy the integer to the output, making sure it fits.
+    if (int_len > 32) {
+      return 1;
+    }
+    memcpy(sig + 32 * (i + 1) - int_len, der + pos, int_len);
+
+    // Move on to the next one.
+    pos += int_len;
+  }
+
+  // Check that there are no trailing elements in the sequence.
+  if (pos != der_len) {
+    return 1;
+  }
+
+  return 0;
 }
