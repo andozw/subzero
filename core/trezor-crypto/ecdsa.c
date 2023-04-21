@@ -24,6 +24,7 @@
 
 #include <assert.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -1073,6 +1074,18 @@ int ecdsa_recover_pub_from_sig(const ecdsa_curve *curve, uint8_t *pub_key,
   bn_write_be(&cp.x, pub_key + 1);
   bn_write_be(&cp.y, pub_key + 33);
   return 0;
+}
+
+void bn_print(const bignum256 *a) {
+  printf("%04x", a->val[8] & 0x0000FFFF);
+  printf("%08x", (a->val[7] << 2) | ((a->val[6] & 0x30000000) >> 28));
+  printf("%07x", a->val[6] & 0x0FFFFFFF);
+  printf("%08x", (a->val[5] << 2) | ((a->val[4] & 0x30000000) >> 28));
+  printf("%07x", a->val[4] & 0x0FFFFFFF);
+  printf("%08x", (a->val[3] << 2) | ((a->val[2] & 0x30000000) >> 28));
+  printf("%07x", a->val[2] & 0x0FFFFFFF);
+  printf("%08x", (a->val[1] << 2) | ((a->val[0] & 0x30000000) >> 28));
+  printf("%07x", a->val[0] & 0x0FFFFFFF);
 }
 
 // returns 0 if verification succeeded
