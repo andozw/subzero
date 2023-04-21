@@ -88,12 +88,58 @@ int run_self_checks(void) {
     return r;
   }
 
-  for (size_t i = 0; i < self_checks_count; ++i) {
-    int t = self_checks[i].func();
-    if (t != 0) {
-      r = -1;
-      ERROR("self check failure: %s failed. rc = %d", self_checks[i].name, t);
-    }
+  // FIXME: move these tests lower
+  t = verify_wycheproof();
+  if (t != 0) {
+    r = -1;
+    ERROR("verify_wycheproof failed.");
+  }
+
+  t = verify_mix_entropy();
+  if (t != 0) {
+    r = -1;
+    ERROR("verify_mix_entropy failed.");
+  }
+
+  t = verify_protect_pubkey();
+  if (t != 0) {
+    r = -1;
+    ERROR("verify_protect_pubkey failed.");
+  }
+
+  t = verify_bip32();
+  if (t != 0) {
+    r = -1;
+    ERROR("self check failure: verify_bip32() failed.");
+  }
+
+  t = verify_sign_tx();
+  if (t != 0) {
+    r = -1;
+    ERROR("self check failure: verify_sign_tx failed.");
+  }
+  t = verify_check_qrsignature_pub();
+  if (t != 0) {
+    r = -1;
+    ERROR("self check failure: verify_check_signature_pub failed. rc = %d", t);
+  }
+
+  t = verify_validate_fees();
+  if (t != 0) {
+    r = -1;
+    ERROR("self check failure: verify_validate_fees failed.");
+  }
+
+  t = verify_no_rollback();
+  if (t != 0) {
+    r = -1;
+    ERROR("self check failure: verify_no_rollback failed.");
+  }
+
+  t = verify_conv_btc_to_satoshi();
+  if (t != 0) {
+    r = -1;
+    ERROR("self check failure: verify_conv_btc_to_satoshi failed.");
   }
 
   // environment specific additional checks + cleanup
@@ -102,5 +148,7 @@ int run_self_checks(void) {
     r = -1;
     ERROR("post_run_self_checks failed.");
   }
+
+  // FIXME: move wycheproof tests here
   return r;
 }

@@ -43,6 +43,7 @@ int verify_protect_pubkey(void);
 int verify_no_rollback(void);
 int verify_check_qrsignature_pub(void);
 int verify_conv_btc_to_satoshi(void);
+int verify_wycheproof(void);
 
 /**
  * Verifies that calling handle_incoming_message() with a serialized protobuf
