@@ -30,7 +30,7 @@ int verify_wycheproof(void) {
     pk = &wycheproof_ecdsa_public_keys[testvectors[t].pk_offset];
     printf("Test Case: %d: ", t);
 
-    for (int i = 0; i < 64; i++) {
+    for (int i = 0; i < 65; i++) {
       printf("%02x", pk[i]);
     }
     printf("\n");
@@ -38,13 +38,15 @@ int verify_wycheproof(void) {
     const ecdsa_curve *curve = &secp256k1;
     curve_point pub;
 
-    int r = ecdsa_read_pubkey(curve, pk, &pub);
-    printf("result: %d\n\n", r);
+    int is_valid_pubkey = ecdsa_read_pubkey(curve, pk, &pub);
+    printf("pubkey valid: %d\n", is_valid_pubkey);
 
     msg = &wycheproof_ecdsa_messages[testvectors[t].msg_offset];
-
     sig = &wycheproof_ecdsa_signatures[testvectors[t].sig_offset];
 
+    int is_valid_sig = ecdsa_verify(curve, HASHER_SHA2, pk, sig, msg, testvectors[t].msg_len);
+
+    printf("sig valid: %d\n\n", is_valid_sig);
   }
 
   return 0;
