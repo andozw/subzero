@@ -10,11 +10,11 @@ int verify_wycheproof(void) {
   INFO("foobar 473737!");
 
   int t;
-  /*for (t = 0; t < SECP256K1_ECDSA_WYCHEPROOF_NUMBER_TESTVECTORS; t++) {*/
-  for (t = 0; t < 2; t++) {
-    const unsigned char *msg, *sig, *pk;
+  for (t = 0; t < SECP256K1_ECDSA_WYCHEPROOF_NUMBER_TESTVECTORS; t++) {
+  /*for (t = 0; t < 2; t++) {*/
+    const unsigned char *msg, *der_sig, *pk;
     (void)msg;
-    (void)sig;
+    (void)der_sig;
     (void)pk;
 
     // trezor pubkey...
@@ -39,7 +39,13 @@ int verify_wycheproof(void) {
     (void)is_valid_pubkey;
 
     msg = &wycheproof_ecdsa_messages[testvectors[t].msg_offset];
-    sig = &wycheproof_ecdsa_signatures[testvectors[t].sig_offset];
+    der_sig = &wycheproof_ecdsa_signatures[testvectors[t].sig_offset];
+
+    uint8_t sig[64] = {0};
+    int temp = ecdsa_sig_from_der(der_sig, testvectors[t].sig_len, sig);
+    if (temp != 0) {
+      ERROR("WTF parsing sig from der: %d", temp);
+    }
 
     // ecdsa_verify returns 0 if verification succeeds.
     int invalid_sig = ecdsa_verify(curve, HASHER_SHA2, pk, sig, msg, testvectors[t].msg_len);
@@ -48,14 +54,14 @@ int verify_wycheproof(void) {
     // convert ecdsa_verify to match our test vectors. 0 = success, !0 = invalid.
     int actual_verify = (invalid_sig == 0) ? 1 : 0;
 
-    if (actual_verify == 1) {
-      printf("Actually valid! %d\n", t);
-      for (int i = 0; i < 65; i++) {
-        printf("%02x", pk[i]);
-      }
-      printf("\n");
-    }
-    continue;
+    /*if (actual_verify == 1) {*/
+      /*printf("Actually valid! %d\n", t);*/
+      /*for (int i = 0; i < 65; i++) {*/
+        /*printf("%02x", pk[i]);*/
+      /*}*/
+      /*printf("\n");*/
+    /*}*/
+    /*continue;*/
 
     printf("expected: %d. actual sig valid: %d\n", testvectors[t].expected_verify, actual_verify);
     if (testvectors[t].expected_verify != actual_verify) {
