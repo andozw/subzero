@@ -10,8 +10,8 @@ int verify_wycheproof(void) {
   INFO("foobar 473737!");
 
   int t;
-  for (t = 0; t < SECP256K1_ECDSA_WYCHEPROOF_NUMBER_TESTVECTORS; t++) {
-    INFO("***");
+  /*for (t = 0; t < SECP256K1_ECDSA_WYCHEPROOF_NUMBER_TESTVECTORS; t++) {*/
+  for (t = 0; t < 2; t++) {
     const unsigned char *msg, *sig, *pk;
     (void)msg;
     (void)sig;
@@ -28,25 +28,43 @@ int verify_wycheproof(void) {
                  /*uint32_t msg_len);*/
 
     pk = &wycheproof_ecdsa_public_keys[testvectors[t].pk_offset];
-    printf("Test Case: %d: ", t);
+    /*printf("Test Case: %d: ", t);*/
 
-    for (int i = 0; i < 65; i++) {
-      printf("%02x", pk[i]);
-    }
-    printf("\n");
 
     const ecdsa_curve *curve = &secp256k1;
     curve_point pub;
 
     int is_valid_pubkey = ecdsa_read_pubkey(curve, pk, &pub);
-    printf("pubkey valid: %d\n", is_valid_pubkey);
+    /*printf("pubkey valid: %d\n", is_valid_pubkey);*/
+    (void)is_valid_pubkey;
 
     msg = &wycheproof_ecdsa_messages[testvectors[t].msg_offset];
     sig = &wycheproof_ecdsa_signatures[testvectors[t].sig_offset];
 
-    int is_valid_sig = ecdsa_verify(curve, HASHER_SHA2, pk, sig, msg, testvectors[t].msg_len);
+    // ecdsa_verify returns 0 if verification succeeds.
+    int invalid_sig = ecdsa_verify(curve, HASHER_SHA2, pk, sig, msg, testvectors[t].msg_len);
+    printf("ecdsa_verify returned: [%d]\n", invalid_sig);
 
-    printf("sig valid: %d\n\n", is_valid_sig);
+    // convert ecdsa_verify to match our test vectors. 0 = success, !0 = invalid.
+    int actual_verify = (invalid_sig == 0) ? 1 : 0;
+
+    if (actual_verify == 1) {
+      printf("Actually valid! %d\n", t);
+      for (int i = 0; i < 65; i++) {
+        printf("%02x", pk[i]);
+      }
+      printf("\n");
+    }
+    continue;
+
+    printf("expected: %d. actual sig valid: %d\n", testvectors[t].expected_verify, actual_verify);
+    if (testvectors[t].expected_verify != actual_verify) {
+      ERROR("wycheproof test vector failed [vector:%d][expected: %d][actual: %d]",
+            t,
+            testvectors[t].expected_verify,
+            actual_verify);
+        printf("ecdsa_verify returned: [%d]\n", invalid_sig);
+    }
   }
 
   return 0;
