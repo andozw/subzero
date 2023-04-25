@@ -9,6 +9,8 @@ int verify_wycheproof(void) {
   #include "wycheproof/ecdsa_secp256k1_sha256_bitcoin_test.h"
   INFO("foobar 473737!");
 
+  int failures = 0;
+
   int t;
   for (t = 0; t < SECP256K1_ECDSA_WYCHEPROOF_NUMBER_TESTVECTORS; t++) {
   /*for (t = 0; t < 2; t++) {*/
@@ -28,7 +30,7 @@ int verify_wycheproof(void) {
                  /*uint32_t msg_len);*/
 
     pk = &wycheproof_ecdsa_public_keys[testvectors[t].pk_offset];
-    /*printf("Test Case: %d: ", t);*/
+    DEBUG("Test Case: %d: ", t);
 
 
     const ecdsa_curve *curve = &secp256k1;
@@ -61,16 +63,20 @@ int verify_wycheproof(void) {
       /*}*/
       /*printf("\n");*/
     /*}*/
-    /*continue;*/
+    /*continue; */
 
-    printf("expected: %d. actual sig valid: %d\n", testvectors[t].expected_verify, actual_verify);
     if (testvectors[t].expected_verify != actual_verify) {
       ERROR("wycheproof test vector failed [vector:%d][expected: %d][actual: %d]",
             t,
             testvectors[t].expected_verify,
             actual_verify);
-        printf("ecdsa_verify returned: [%d]\n", invalid_sig);
+      printf("ecdsa_verify returned: [%d]\n", invalid_sig);
+      failures++;
     }
+  }
+
+  if (failures != 0) {
+    ERROR("%d test vectors failed.", failures);
   }
 
   return 0;
