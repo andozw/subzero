@@ -71,6 +71,11 @@ int verify_wycheproof(void) {
             testvectors[t].expected_verify,
             actual_verify);
       printf("ecdsa_verify returned: [%d]\n", invalid_sig);
+      for (unsigned long i = 0; i < testvectors[t].sig_len; i++) {
+        printf("%02x", der_sig[i]);
+      }
+      printf("\n");
+
       failures++;
     }
   }
