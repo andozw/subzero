@@ -56,9 +56,15 @@ int verify_wycheproof(void) {
     }
     printf("\n");
 
-    printf("signature: ");
+    printf("der_sig: ");
     for (size_t i = 0; i < testvectors[t].sig_len; i++) {
       printf("%02x", der_sig[i]);
+    }
+    printf("\n");
+
+    printf("parsed signature: ");
+    for (size_t i = 0; i < 64; i++) {
+      printf("%02x", sig[i]);
     }
     printf("\n");
 
@@ -77,6 +83,39 @@ int verify_wycheproof(void) {
       /*printf("\n");*/
     /*}*/
     /*continue; */
+
+    /*
+      tcid: 1
+      * >>> n2 = 0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0
+>>> s = 0x900e75ad233fcc908509dbff5922647db37c21f4afd3203ae8dc4ae7794b0f87
+>>> s > n2
+      true
+      */
+
+    // tcid: 100
+    // the tc 100 does not encode leading zeros that it should
+    // tc100 has a signature whose r is encoded as just a 0x20-byte long bignum, where it should be 0x21-byte long integer with a leading 0x00. Our parser is a bit too lenient. We’re not using this DER parser for anything other than testing.
+
+// 2:32
+// the “problem” is that the parser is lenient on that
+// 2:33
+// DER is deterministic: there’s only 1 encoding for a given (r,s)
+// 2:33
+// this parser is too lenient and admits signatures that are not strictly DER-encoded
+// 2:33
+// in particular, tc100 has a signature whose r is encoded as just a 0x20 byte integer
+// 2:33
+// where it should be 0x21-byte long integer with a leading 0x00
+// 2:34
+// -> would make a table of “exception for the test cases”
+// 2:34
+// so like when you’re hitting tcID=100, you skip it and do not fail
+// 2:34
+// and have a great description for each exception
+
+    // test case 388
+    // r = 7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0
+    // s = 7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a1
 
     if (testvectors[t].expected_verify != actual_verify) {
       ERROR("wycheproof test vector failed [vector:%d][expected: %d][actual: %d]",
