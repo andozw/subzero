@@ -30,8 +30,7 @@ int verify_wycheproof(void) {
                  /*uint32_t msg_len);*/
 
     pk = &wycheproof_ecdsa_public_keys[testvectors[t].pk_offset];
-    DEBUG("Test Case: %d: ", t);
-
+    DEBUG("Test Case: %d: ", t + 1);
 
     const ecdsa_curve *curve = &secp256k1;
     curve_point pub;
@@ -44,10 +43,24 @@ int verify_wycheproof(void) {
     der_sig = &wycheproof_ecdsa_signatures[testvectors[t].sig_offset];
 
     uint8_t sig[64] = {0};
+
     int temp = ecdsa_sig_from_der(der_sig, testvectors[t].sig_len, sig);
+
     if (temp != 0) {
       ERROR("WTF parsing sig from der: %d", temp);
     }
+
+    printf("public key: ");
+    for (int i = 0; i < 65; i++) {
+      printf("%02x", pk[i]);
+    }
+    printf("\n");
+
+    printf("signature: ");
+    for (size_t i = 0; i < testvectors[t].sig_len; i++) {
+      printf("%02x", der_sig[i]);
+    }
+    printf("\n");
 
     // ecdsa_verify returns 0 if verification succeeds.
     int invalid_sig = ecdsa_verify(curve, HASHER_SHA2, pk, sig, msg, testvectors[t].msg_len);

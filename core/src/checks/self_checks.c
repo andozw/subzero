@@ -88,8 +88,8 @@ int run_self_checks(void) {
     return r;
   }
 
-  // FIXME: move these tests lower
-  t = verify_wycheproof();
+  // FIXME: move these tests lower, merge with Ilya's new strategy
+  int t = verify_wycheproof();
   if (t != 0) {
     r = -1;
     ERROR("verify_wycheproof failed.");

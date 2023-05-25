@@ -1220,9 +1220,31 @@ int ecdsa_sig_to_der(const uint8_t *sig, uint8_t *der) {
 int ecdsa_sig_from_der(const uint8_t *der, size_t der_len, uint8_t sig[64]) {
   memzero(sig, 64);
 
+  printf("\nDER: ");
+  for (int i = 0; i < der_len; i++) {
+    printf("%02x", der[i]);
+  }
+  printf("\n");
+
+
   // Check sequence header.
-  if (der_len < 2 || der_len > 72 || der[0] != 0x30 || der[1] != der_len - 2) {
-    return 1;
+  if (der_len < 2) {
+    return 101;
+  }
+
+  if (der_len > 72 ) {
+    printf("python length is: %d\n", der_len);
+    return 1011;
+  }
+
+  if (der[0] != 0x30) {
+    return 1012;
+  }
+
+  if (der[1] != der_len - 2) {
+    printf("der len: %d\n", der_len);
+    printf("2nd byte: %d\n", der[1]);
+    return 1013;
   }
 
   // Read two DER-encoded integers.
@@ -1230,14 +1252,14 @@ int ecdsa_sig_from_der(const uint8_t *der, size_t der_len, uint8_t sig[64]) {
   for (int i = 0; i < 2; ++i) {
     // Check integer header.
     if (der_len < pos + 2 || der[pos] != 0x02) {
-      return 1;
+      return 102;
     }
 
     // Locate the integer.
     size_t int_len = der[pos + 1];
     pos += 2;
     if (pos + int_len > der_len) {
-      return 1;
+      return 103;
     }
 
     // Skip a possible leading zero.
@@ -1248,7 +1270,7 @@ int ecdsa_sig_from_der(const uint8_t *der, size_t der_len, uint8_t sig[64]) {
 
     // Copy the integer to the output, making sure it fits.
     if (int_len > 32) {
-      return 1;
+      return 104;
     }
     memcpy(sig + 32 * (i + 1) - int_len, der + pos, int_len);
 
@@ -1258,8 +1280,9 @@ int ecdsa_sig_from_der(const uint8_t *der, size_t der_len, uint8_t sig[64]) {
 
   // Check that there are no trailing elements in the sequence.
   if (pos != der_len) {
-    return 1;
+    return 105;
   }
 
+  printf("SUCCESS parsing DER\n");
   return 0;
 }
