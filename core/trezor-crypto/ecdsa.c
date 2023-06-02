@@ -1080,18 +1080,6 @@ int ecdsa_recover_pub_from_sig(const ecdsa_curve *curve, uint8_t *pub_key,
   return 0;
 }
 
-void bn_print(const bignum256 *a) {
-  printf("%04x", a->val[8] & 0x0000FFFF);
-  printf("%08x", (a->val[7] << 2) | ((a->val[6] & 0x30000000) >> 28));
-  printf("%07x", a->val[6] & 0x0FFFFFFF);
-  printf("%08x", (a->val[5] << 2) | ((a->val[4] & 0x30000000) >> 28));
-  printf("%07x", a->val[4] & 0x0FFFFFFF);
-  printf("%08x", (a->val[3] << 2) | ((a->val[2] & 0x30000000) >> 28));
-  printf("%07x", a->val[2] & 0x0FFFFFFF);
-  printf("%08x", (a->val[1] << 2) | ((a->val[0] & 0x30000000) >> 28));
-  printf("%07x", a->val[0] & 0x0FFFFFFF);
-}
-
 // returns 0 if verification succeeded
 int ecdsa_verify_digest(const ecdsa_curve *curve, const uint8_t *pub_key,
                         const uint8_t *sig, const uint8_t *digest) {
@@ -1134,14 +1122,6 @@ int ecdsa_verify_digest(const ecdsa_curve *curve, const uint8_t *pub_key,
     bn_mod(&(res.x), &curve->order);
     // signature does not match
     if (!bn_is_equal(&res.x, &r)) {
-      printf("res.x: ");
-      bn_print(&res.x);
-      printf("\n");
-
-      printf("r:     ");
-      bn_print(&r);
-      printf("\n");
-
       result = 5;
     }
   }

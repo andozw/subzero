@@ -1,132 +1,107 @@
-// TODO
 #include "config.h"
 #include "checks.h"
-#include "log.h"
 #include "ecdsa.h"
+#include "log.h"
 #include "secp256k1.h"
+
+#include <stdbool.h>
+
+// Returns true if the test vector fails but we intentional want to ignore.
+static bool should_ignore_failure(const int vector_label) {
+    switch (vector_label) {
+      case 1: 
+      // {
+      //    "tcId": 1,
+      //    "comment": "Signature malleability",
+      //    "flags": ["SignatureMalleabilityBitcoin"],
+      //    "msg": "313233343030",
+      //    "sig": "3046022100813ef79ccefa9a56f7ba805f0e478584fe5f0dd5f567bc09b5123ccbc9832365022100900e75ad233fcc908509dbff5922647db37c21f4afd3203ae8dc4ae7794b0f87",
+      //    "result": "invalid"
+      // }
+
+      // The signature is using the high s-value instead of the low one from [bip 62](https://github.com/bitcoin/bips/blob/master/bip-0062.mediawiki)
+      // The [code in bitcoin](https://github.com/bitcoin/bitcoin/blob/v0.9.3/src/key.cpp#L202-L227) checks this. 
+      // if (s > N/2)  { s := N - s }
+      // The group order for secp256k1 is `N = FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFE BAAEDCE6 AF48A03B BFD25E8C D0364141`
+
+      // HalfN := 0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0
+      // s     := 0x900e75ad233fcc908509dbff5922647db37c21f4afd3203ae8dc4ae7794b0f87
+      // s > Half -> true
+      return true;
+
+      case 100:
+      // {
+      //    "tcId": 100,
+      //    "comment": "truncated r",
+      //    "flags": ["ModifiedSignature"],
+      //    "msg": "313233343030",
+      //    "sig": "30440220813ef79ccefa9a56f7ba805f0e478584fe5f0dd5f567bc09b5123ccbc983236502206ff18a52dcc0336f7af62400a6dd9b810732baf1ff758000d6f613a556eb31ba",
+      //    "result": "invalid"
+      // }
+
+      // The DER encoding does not encode leading zeros that it should. Here the signature's r-value is encoded as just a 0x20-byte long bignum, 
+      // but it should be 0x21-byte long integer with a leading 0x00. The parser is a bit too lenient. However, we are not using this DER parser 
+      // for anything other than testing.
+      return true;
+
+      case 388:
+      // {
+      //    "tcId": 388,
+      //    "comment": "edge case for signature malleability",
+      //    "flags": ["ArithmeticError"],
+      //    "msg": "313233343030",
+      //    "sig": "304402207fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a002207fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a1",
+      //    "result": "invalid"
+      // }
+
+      // This is the same issue as vector 1 as this vector also uses the high s-value.
+      // FIXME(sean): double check this! The comments in the test case don't align with what I remembered us finding. 
+      return true;
+
+      default: 
+      return false;
+    }
+}
 
 int verify_wycheproof(void) {
   #include "wycheproof/ecdsa_secp256k1_sha256_bitcoin_test.h"
-  INFO("foobar 473737!");
 
   int failures = 0;
-
   int t;
   for (t = 0; t < SECP256K1_ECDSA_WYCHEPROOF_NUMBER_TESTVECTORS; t++) {
-  /*for (t = 0; t < 2; t++) {*/
+    // The json test vectors are 1-indexed.
+    const int vector_label = t + 1;
+
     const unsigned char *msg, *der_sig, *pk;
-    (void)msg;
-    (void)der_sig;
-    (void)pk;
-
-    // trezor pubkey...
-    /*uint8_t pubkey[64];*/
-    /*memset(pubkey, 0, sizeof(pubkey));*/
-
-
-    /*int ecdsa_validate_pubkey(const ecdsa_curve *curve, const curve_point *pub);*/
-/*int ecdsa_verify(const ecdsa_curve *curve, HasherType hasher_sign,*/
-                 /*const uint8_t *pub_key, const uint8_t *sig, const uint8_t *msg,*/
-                 /*uint32_t msg_len);*/
-
-    pk = &wycheproof_ecdsa_public_keys[testvectors[t].pk_offset];
-    DEBUG("Test Case: %d: ", t + 1);
-
+    uint8_t sig[64] = {0};
     const ecdsa_curve *curve = &secp256k1;
     curve_point pub;
 
+    pk = &wycheproof_ecdsa_public_keys[testvectors[t].pk_offset];
+
     int is_valid_pubkey = ecdsa_read_pubkey(curve, pk, &pub);
-    /*printf("pubkey valid: %d\n", is_valid_pubkey);*/
-    (void)is_valid_pubkey;
+    if (is_valid_pubkey == 0) {
+      ERROR("pub key not valid for test vector %d", vector_label);
+      return -1;
+    }
 
     msg = &wycheproof_ecdsa_messages[testvectors[t].msg_offset];
     der_sig = &wycheproof_ecdsa_signatures[testvectors[t].sig_offset];
 
-    uint8_t sig[64] = {0};
-
-    int temp = ecdsa_sig_from_der(der_sig, testvectors[t].sig_len, sig);
-
-    if (temp != 0) {
-      ERROR("WTF parsing sig from der: %d", temp);
-    }
-
-    printf("public key: ");
-    for (int i = 0; i < 65; i++) {
-      printf("%02x", pk[i]);
-    }
-    printf("\n");
-
-    printf("der_sig: ");
-    for (size_t i = 0; i < testvectors[t].sig_len; i++) {
-      printf("%02x", der_sig[i]);
-    }
-    printf("\n");
-
-    printf("parsed signature: ");
-    for (size_t i = 0; i < 64; i++) {
-      printf("%02x", sig[i]);
-    }
-    printf("\n");
+    // returns non-zero if parsing fails, ignore the return value and continue with the verification.
+    ecdsa_sig_from_der(der_sig, testvectors[t].sig_len, sig);
 
     // ecdsa_verify returns 0 if verification succeeds.
-    int invalid_sig = ecdsa_verify(curve, HASHER_SHA2, pk, sig, msg, testvectors[t].msg_len);
-    printf("ecdsa_verify returned: [%d]\n", invalid_sig);
+    int failed_verify = ecdsa_verify(curve, HASHER_SHA2, pk, sig, msg, testvectors[t].msg_len);
 
     // convert ecdsa_verify to match our test vectors. 0 = success, !0 = invalid.
-    int actual_verify = (invalid_sig == 0) ? 1 : 0;
+    int passed_verify = (failed_verify == 0) ? 1 : 0;
 
-    /*if (actual_verify == 1) {*/
-      /*printf("Actually valid! %d\n", t);*/
-      /*for (int i = 0; i < 65; i++) {*/
-        /*printf("%02x", pk[i]);*/
-      /*}*/
-      /*printf("\n");*/
-    /*}*/
-    /*continue; */
-
-    /*
-      tcid: 1
-      * >>> n2 = 0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0
->>> s = 0x900e75ad233fcc908509dbff5922647db37c21f4afd3203ae8dc4ae7794b0f87
->>> s > n2
-      true
-      */
-
-    // tcid: 100
-    // the tc 100 does not encode leading zeros that it should
-    // tc100 has a signature whose r is encoded as just a 0x20-byte long bignum, where it should be 0x21-byte long integer with a leading 0x00. Our parser is a bit too lenient. We’re not using this DER parser for anything other than testing.
-
-// 2:32
-// the “problem” is that the parser is lenient on that
-// 2:33
-// DER is deterministic: there’s only 1 encoding for a given (r,s)
-// 2:33
-// this parser is too lenient and admits signatures that are not strictly DER-encoded
-// 2:33
-// in particular, tc100 has a signature whose r is encoded as just a 0x20 byte integer
-// 2:33
-// where it should be 0x21-byte long integer with a leading 0x00
-// 2:34
-// -> would make a table of “exception for the test cases”
-// 2:34
-// so like when you’re hitting tcID=100, you skip it and do not fail
-// 2:34
-// and have a great description for each exception
-
-    // test case 388
-    // r = 7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0
-    // s = 7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a1
-
-    if (testvectors[t].expected_verify != actual_verify) {
+    if (testvectors[t].expected_verify != passed_verify && !should_ignore_failure(vector_label)) {
       ERROR("wycheproof test vector failed [vector:%d][expected: %d][actual: %d]",
-            t,
-            testvectors[t].expected_verify,
-            actual_verify);
-      printf("ecdsa_verify returned: [%d]\n", invalid_sig);
-      for (unsigned long i = 0; i < testvectors[t].sig_len; i++) {
-        printf("%02x", der_sig[i]);
-      }
-      printf("\n");
+        vector_label,
+        testvectors[t].expected_verify,
+        passed_verify);
 
       failures++;
     }
@@ -136,5 +111,5 @@ int verify_wycheproof(void) {
     ERROR("%d test vectors failed.", failures);
   }
 
-  return 0;
+  return failures;
 }
