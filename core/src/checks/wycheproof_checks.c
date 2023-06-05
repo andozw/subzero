@@ -6,8 +6,61 @@
 
 #include <stdbool.h>
 
+// This function was copied from the trezor-firmware library, and was not included
+// in the initial fork. 
+// https://github.com/trezor/trezor-firmware/blob/fee0d70211e89629e682f6cda95a83d17ea88825/crypto/ecdsa.c#L1206
+// 
+// Parse a DER-encoded signature. We don't check whether the encoded integers
+// satisfy DER requirements regarding leading zeros.
+int ecdsa_sig_from_der(const uint8_t *der, size_t der_len, uint8_t sig[64]) {
+  memzero(sig, 64);
+
+  // Check sequence header.
+  if (der_len < 2 || der_len > 72 || der[0] != 0x30 || der[1] != der_len - 2) {
+    return 1;
+  }
+
+  // Read two DER-encoded integers.
+  size_t pos = 2;
+  for (int i = 0; i < 2; ++i) {
+    // Check integer header.
+    if (der_len < pos + 2 || der[pos] != 0x02) {
+      return 1;
+    }
+
+    // Locate the integer.
+    size_t int_len = der[pos + 1];
+    pos += 2;
+    if (pos + int_len > der_len) {
+      return 1;
+    }
+
+    // Skip a possible leading zero.
+    if (int_len != 0 && der[pos] == 0) {
+      int_len--;
+      pos++;
+    }
+
+    // Copy the integer to the output, making sure it fits.
+    if (int_len > 32) {
+      return 1;
+    }
+    memcpy(sig + 32 * (i + 1) - int_len, der + pos, int_len);
+
+    // Move on to the next one.
+    pos += int_len;
+  }
+
+  // Check that there are no trailing elements in the sequence.
+  if (pos != der_len) {
+    return 1;
+  }
+
+  return 0;
+}
+
 // Returns true if the test vector fails but we intentional want to ignore.
-static bool should_ignore_failure(const int vector_label) {
+static bool should_ignore_failure(int vector_label) {
     switch (vector_label) {
       case 1: 
       // {
@@ -63,12 +116,12 @@ static bool should_ignore_failure(const int vector_label) {
     }
 }
 
+// runs tests against each wycheproof vector and reports any failures
 int verify_wycheproof(void) {
   #include "wycheproof/ecdsa_secp256k1_sha256_bitcoin_test.h"
 
   int failures = 0;
-  int t;
-  for (t = 0; t < SECP256K1_ECDSA_WYCHEPROOF_NUMBER_TESTVECTORS; t++) {
+  for (int t = 0; t < SECP256K1_ECDSA_WYCHEPROOF_NUMBER_TESTVECTORS; t++) {
     // The json test vectors are 1-indexed.
     const int vector_label = t + 1;
 
@@ -88,22 +141,25 @@ int verify_wycheproof(void) {
     msg = &wycheproof_ecdsa_messages[testvectors[t].msg_offset];
     der_sig = &wycheproof_ecdsa_signatures[testvectors[t].sig_offset];
 
-    // returns non-zero if parsing fails, ignore the return value and continue with the verification.
+    // returns non-zero if parsing fails, ignore the return value and continue with the verification, and 
+    // in an actual verification function, we would bail if we found a problem here.
     ecdsa_sig_from_der(der_sig, testvectors[t].sig_len, sig);
 
     // ecdsa_verify returns 0 if verification succeeds.
     int failed_verify = ecdsa_verify(curve, HASHER_SHA2, pk, sig, msg, testvectors[t].msg_len);
 
     // convert ecdsa_verify to match our test vectors. 0 = success, !0 = invalid.
-    int passed_verify = (failed_verify == 0) ? 1 : 0;
+    int actual_verify = (failed_verify == 0) ? 1 : 0;
 
-    if (testvectors[t].expected_verify != passed_verify && !should_ignore_failure(vector_label)) {
-      ERROR("wycheproof test vector failed [vector:%d][expected: %d][actual: %d]",
-        vector_label,
-        testvectors[t].expected_verify,
-        passed_verify);
+    if (testvectors[t].expected_verify != actual_verify) {
+      if (!should_ignore_failure(vector_label)) {
+        ERROR("wycheproof test vector failed [vector:%d][expected: %d][actual: %d]",
+          vector_label,
+          testvectors[t].expected_verify,
+          actual_verify);
 
-      failures++;
+        failures++;
+      }
     }
   }
 
